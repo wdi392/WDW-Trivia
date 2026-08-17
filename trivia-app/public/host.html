@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Host Console — Are You Smarter Than a 5th Grader?</title>
+<style>
+  :root { --yellow:#ffd23f; --red:#ff5e5e; --blue:#2e86de; --green:#2ecc71; --purple:#7d5fff; --dark:#1e2a3a; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; font-family:'Trebuchet MS','Segoe UI',sans-serif;
+    background:#101828; color:#fff; padding:24px;
+  }
+  h1 { font-size:1.6rem; margin:0 0 4px; }
+  h1 span.hi { color:var(--yellow); }
+  .subtitle { color:#9aa3b5; margin-bottom:20px; font-size:0.9rem; }
+  .layout { display:grid; grid-template-columns:2fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:900px) { .layout { grid-template-columns:1fr; } }
+  .panel { background:#182236; border-radius:16px; padding:20px; margin-bottom:16px; }
+  .panel h2 { font-size:1rem; color:var(--yellow); margin:0 0 12px; }
+  .round-list { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+  .round-btn {
+    background:#233150; color:#fff; border:2px solid #34456e; padding:10px 14px; border-radius:10px;
+    cursor:pointer; text-align:left; font-size:0.92rem; font-weight:bold;
+  }
+  .round-btn.active { border-color:var(--yellow); background:#3a3316; }
+  .control-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  button.ctrl {
+    background:var(--blue); color:#fff; border:none; padding:10px 18px; border-radius:10px; font-weight:bold;
+    cursor:pointer; font-size:0.9rem;
+  }
+  button.ctrl.green { background:var(--green); }
+  button.ctrl.red { background:var(--red); }
+  button.ctrl:disabled { opacity:0.35; cursor:not-allowed; }
+  .status-line { display:flex; justify-content:space-between; font-size:0.85rem; color:#9aa3b5; margin-bottom:10px; }
+  .status-line b { color:#fff; }
+  .big-question { font-size:1.5rem; font-weight:bold; margin:10px 0 16px; min-height:44px; }
+  .options-list { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .opt-box { background:#233150; border-radius:10px; padding:12px; font-size:0.95rem; }
+  .opt-box.correct { background:#1d4a33; border:2px solid var(--green); }
+  .timer-display { font-size:2.4rem; font-weight:bold; color:var(--yellow); text-align:center; margin-bottom:10px; }
+  .leaderboard-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #233150; font-size:0.9rem; }
+  .leaderboard-row .rank { color:#9aa3b5; margin-right:8px; }
+  .leaderboard-row.disconnected { opacity:0.4; }
+  .pill { display:inline-block; padding:3px 9px; border-radius:12px; font-size:0.7rem; font-weight:bold; background:var(--purple); margin-left:6px; }
+  .join-url { background:#233150; border-radius:10px; padding:10px 14px; font-size:0.85rem; word-break:break-all; }
+  .empty { color:#657193; font-size:0.85rem; }
+</style>
+</head>
+<body>
+  <h1>Host Console <span class="hi">— Are You Smarter Than a 5th Grader?</span></h1>
+  <p class="subtitle">Keep this screen visible on a shared display. Players join at <span id="join-url-inline"></span></p>
+
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <h2>Game Flow</h2>
+        <div class="round-list" id="round-list"></div>
+        <div class="control-row">
+          <button class="ctrl" id="next-btn">Next Question</button>
+          <button class="ctrl" id="reveal-btn">Reveal Now</button>
+          <button class="ctrl red" id="end-btn">End Game</button>
+        </div>
+        <div class="status-line">
+          <span>Phase: <b id="phase-label">lobby</b></span>
+          <span><b id="answered-count">0</b>/<b id="total-players">0</b> answered</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 id="question-panel-title">Current Question</h2>
+        <div class="timer-display" id="timer-display">--</div>
+        <div class="big-question" id="big-question">Waiting for the host to start a round…</div>
+        <div class="options-list" id="options-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Join Link</h2>
+        <div class="join-url" id="join-url"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Live Leaderboard</h2>
+      <div id="leaderboard"><div class="empty">No players yet.</div></div>
+    </div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function() {
+  const socket = io();
+  socket.emit("host:join");
+
+  const joinUrl = `${location.protocol}//${location.host}/`;
+  document.getElementById("join-url").textContent = joinUrl;
+  document.getElementById("join-url-inline").textContent = joinUrl;
+
+  let roundsMeta = [];
+  let currentRoundIndex = -1;
+
+  document.getElementById("next-btn").addEventListener("click", () => socket.emit("host:nextQuestion"));
+  document.getElementById("reveal-btn").addEventListener("click", () => socket.emit("host:reveal"));
+  document.getElementById("end-btn").addEventListener("click", () => {
+    if (confirm("End the game and show final results to everyone?")) socket.emit("host:endGame");
+  });
+
+  function renderRoundList() {
+    const container = document.getElementById("round-list");
+    container.innerHTML = "";
+    roundsMeta.forEach((r) => {
+      const btn = document.createElement("div");
+      btn.className = "round-btn" + (r.index === currentRoundIndex ? " active" : "");
+      btn.textContent = `${r.name} (${r.questionCount}Q)`;
+      btn.addEventListener("click", () => socket.emit("host:startRound", { roundIndex: r.index }));
+      container.appendChild(btn);
+    });
+  }
+
+  let timerInterval = null;
+  let lastStartTime = null;
+  function startTimerDisplay(startTime, timeLimit) {
+    if (startTime === lastStartTime) return;
+    lastStartTime = startTime;
+    clearInterval(timerInterval);
+    function tick() {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const remaining = Math.max(0, Math.ceil(timeLimit - elapsed));
+      document.getElementById("timer-display").textContent = remaining;
+      if (remaining <= 0) clearInterval(timerInterval);
+    }
+    tick();
+    timerInterval = setInterval(tick, 250);
+  }
+
+  socket.on("host:state", (state) => {
+    roundsMeta = state.roundList;
+    currentRoundIndex = state.roundIndex;
+    renderRoundList();
+
+    document.getElementById("phase-label").textContent = state.phase;
+    document.getElementById("answered-count").textContent = state.wagering ? state.wageredCount : state.answeredCount;
+    document.getElementById("total-players").textContent = state.totalPlayers;
+
+    document.getElementById("question-panel-title").textContent = state.roundName
+      ? `${state.roundName} — Q${state.questionIndex + 1}/${state.totalQuestionsInRound}`
+      : "Current Question";
+
+    if (state.questionText) {
+      document.getElementById("big-question").textContent =
+        (state.phase === "wager" ? "💰 Wager phase — question coming up next" : state.questionText);
+    } else if (state.phase === "lobby") {
+      document.getElementById("big-question").textContent = "Waiting for the host to start a round…";
+    }
+
+    const optionsList = document.getElementById("options-list");
+    if (state.options && state.phase !== "wager") {
+      optionsList.innerHTML = "";
+      state.options.forEach((opt) => {
+        const div = document.createElement("div");
+        div.className = "opt-box";
+        div.textContent = opt;
+        optionsList.appendChild(div);
+      });
+    } else {
+      optionsList.innerHTML = "";
+    }
+
+    if (state.timeLimit && state.startTime && (state.phase === "question" || state.phase === "wager")) {
+      startTimerDisplay(state.startTime, state.timeLimit);
+    }
+    if (state.phase === "lobby" || state.phase === "reveal" || state.phase === "ended") {
+      clearInterval(timerInterval);
+      lastStartTime = null;
+    }
+
+    renderLeaderboard(state.players);
+
+    document.getElementById("next-btn").disabled = state.phase === "ended";
+    document.getElementById("reveal-btn").disabled = state.phase !== "question" && state.phase !== "wager";
+    document.getElementById("reveal-btn").textContent = state.phase === "wager" ? "Skip to Question" : "Reveal Now";
+  });
+
+  socket.on("host:reveal", (data) => {
+    clearInterval(timerInterval);
+    document.getElementById("timer-display").textContent = "✓";
+    document.querySelectorAll(".opt-box").forEach((el) => {
+      if (el.textContent === data.correctText) el.classList.add("correct");
+    });
+    renderLeaderboard(data.leaderboard);
+  });
+
+  function renderLeaderboard(players) {
+    const container = document.getElementById("leaderboard");
+    if (!players || players.length === 0) {
+      container.innerHTML = '<div class="empty">No players yet.</div>';
+      return;
+    }
+    container.innerHTML = "";
+    players.forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "leaderboard-row" + (p.connected ? "" : " disconnected");
+      row.innerHTML = `<span><span class="rank">#${i + 1}</span>${p.name}${p.connected ? "" : " (left)"}</span><span>${p.score} pts</span>`;
+      container.appendChild(row);
+    });
+  }
+})();
+</script>
+</body>
+</html>

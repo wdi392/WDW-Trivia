@@ -1,0 +1,16 @@
+{
+  "name": "smarter-than-a-5th-grader-live",
+  "version": "1.0.0",
+  "description": "Live multiplayer 'Are You Smarter Than a 5th Grader?' trivia app with host console, per-question timer, individual scoring, peek/copy cheats, and a wagering bonus round.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}

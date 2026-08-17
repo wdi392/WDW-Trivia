@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Are You Smarter Than a 5th Grader?</title>
+<style>
+  :root {
+    --yellow:#ffd23f; --red:#ff5e5e; --blue:#2e86de; --green:#2ecc71; --purple:#7d5fff; --dark:#1e2a3a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; font-family:'Trebuchet MS','Segoe UI',sans-serif;
+    background: linear-gradient(135deg,#2e3192,#1bffff,#ffd23f);
+    background-size:400% 400%; animation: gradientShift 18s ease infinite;
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  @keyframes gradientShift { 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+  .card {
+    background:#fff; border-radius:22px; box-shadow:0 20px 50px rgba(0,0,0,0.35);
+    width:100%; max-width:460px; padding:28px 24px; text-align:center;
+  }
+  h1 { font-size:1.5rem; color:var(--dark); margin:0 0 6px; }
+  h1 span.hi { color:var(--red); }
+  .subtitle { color:#55607a; margin-bottom:20px; font-size:0.92rem; }
+  input[type=text] {
+    width:100%; padding:12px 14px; font-size:1rem; border-radius:12px; border:2px solid #dfe4ee;
+    margin-bottom:14px; text-align:center;
+  }
+  button.big {
+    background:var(--red); color:#fff; border:none; padding:13px 30px; font-size:1.05rem; font-weight:bold;
+    border-radius:40px; cursor:pointer; box-shadow:0 6px 0 #c93b3b; width:100%;
+  }
+  button.big:active { transform:translateY(4px); box-shadow:0 2px 0 #c93b3b; }
+  button.big:disabled { opacity:0.5; cursor:not-allowed; }
+  .hidden { display:none !important; }
+  .waiting-icon { font-size:2.6rem; margin-bottom:8px; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; font-size:0.85rem; font-weight:bold; color:var(--dark); }
+  .badge { display:inline-block; padding:5px 12px; border-radius:16px; font-size:0.72rem; font-weight:bold; color:#fff; }
+  .badge.round { background:var(--purple); }
+  .badge.points { background:var(--green); }
+  .timer { font-size:1.3rem; font-weight:bold; color:var(--red); }
+  .progress-bar { height:8px; background:#eee; border-radius:6px; overflow:hidden; margin-bottom:16px; }
+  .progress-fill { height:100%; background:var(--yellow); transition:width 1s linear; }
+  .question-text { font-size:1.15rem; font-weight:bold; color:var(--dark); margin:8px 0 18px; line-height:1.4; }
+  .options { display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:14px; }
+  .opt {
+    background:#f4f6fb; border:2px solid #dfe4ee; border-radius:12px; padding:13px 12px; font-size:0.98rem;
+    color:var(--dark); cursor:pointer; text-align:left; transition:all 0.15s ease;
+  }
+  .opt:hover:not(.disabled) { border-color:var(--blue); background:#eaf2ff; }
+  .opt.chosen { border-color:var(--blue); background:#dbeaff; }
+  .opt.correct { background:#d9f7e6; border-color:var(--green); color:#1a7a43; }
+  .opt.wrong { background:#ffe1e1; border-color:var(--red); color:#b23636; }
+  .opt.disabled { cursor:default; opacity:0.85; }
+  .cheat-row { display:flex; gap:10px; margin-bottom:14px; }
+  .cheat-btn {
+    flex:1; background:#fff; border:2px solid var(--purple); color:var(--purple); font-weight:bold;
+    border-radius:12px; padding:10px 8px; font-size:0.85rem; cursor:pointer;
+  }
+  .cheat-btn:disabled { opacity:0.4; cursor:not-allowed; border-color:#ccc; color:#999; }
+  .banner {
+    background:#fff8e1; border:2px solid var(--yellow); border-radius:12px; padding:10px 12px;
+    font-size:0.85rem; margin-bottom:12px; color:var(--dark); text-align:left;
+  }
+  .banner.error { background:#ffe1e1; border-color:var(--red); color:#b23636; }
+  .wager-input-row { display:flex; align-items:center; gap:8px; margin-bottom:16px; }
+  .wager-input-row input { flex:1; margin-bottom:0; }
+  .score-line { font-size:1rem; color:var(--dark); margin-bottom:16px; }
+  .score-line b { color:var(--purple); }
+  .reveal-result { font-size:1.4rem; font-weight:bold; margin-bottom:6px; }
+  .reveal-result.correct { color:#1a7a43; }
+  .reveal-result.wrong { color:#b23636; }
+  .reveal-sub { color:#55607a; margin-bottom:18px; }
+  .leaderboard { text-align:left; background:#f8f9fc; border-radius:14px; padding:14px 16px; margin-top:6px; }
+  .leaderboard h3 { margin:0 0 10px; font-size:0.9rem; color:var(--dark); }
+  .lb-row { display:flex; justify-content:space-between; font-size:0.88rem; padding:4px 0; color:#333; }
+  .lb-row.me { font-weight:bold; color:var(--blue); }
+  .lb-rank { color:#9aa3b5; margin-right:6px; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+
+  <!-- JOIN SCREEN -->
+  <div id="join-screen">
+    <div class="waiting-icon">🍎📚✏️</div>
+    <h1>Are You Smarter Than<br><span class="hi">a 5th Grader?</span></h1>
+    <p class="subtitle">Enter your name to join the live game.</p>
+    <input type="text" id="name-input" placeholder="Your name" maxlength="24">
+    <button class="big" id="join-btn">Join Game</button>
+  </div>
+
+  <!-- WAITING SCREEN -->
+  <div id="waiting-screen" class="hidden">
+    <div class="waiting-icon">⏳</div>
+    <h1 id="waiting-title">You're in!</h1>
+    <p class="subtitle" id="waiting-sub">Waiting for the host to start the game…</p>
+  </div>
+
+  <!-- WAGER SCREEN -->
+  <div id="wager-screen" class="hidden">
+    <div class="topbar">
+      <span class="badge round" id="wager-round-badge">Bonus Round</span>
+      <span class="timer" id="wager-timer">20</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="wager-progress"></div></div>
+    <div class="question-text">💰 Place your wager!</div>
+    <p class="score-line">Your current score: <b id="wager-current-score">0</b> points</p>
+    <div class="wager-input-row">
+      <input type="text" inputmode="numeric" id="wager-input" placeholder="0">
+      <button class="cheat-btn" id="wager-max-btn" style="flex:0 0 auto;">Max</button>
+    </div>
+    <button class="big" id="wager-submit-btn">Lock In Wager</button>
+    <div class="banner hidden" id="wager-ack-banner"></div>
+  </div>
+
+  <!-- QUESTION SCREEN -->
+  <div id="question-screen" class="hidden">
+    <div class="topbar">
+      <span class="badge round" id="q-round-badge">Round 1</span>
+      <span class="timer" id="q-timer">30</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="q-progress"></div></div>
+    <div class="topbar" style="margin-bottom:6px;">
+      <span id="q-counter">Question 1 of 10</span>
+      <span class="badge points" id="q-points-badge">10 pts</span>
+    </div>
+    <div class="question-text" id="q-text">Question text</div>
+    <div class="banner hidden" id="cheat-banner"></div>
+    <div class="options" id="q-options"></div>
+    <div class="cheat-row">
+      <button class="cheat-btn" id="peek-btn">👀 Peek (1 left)</button>
+      <button class="cheat-btn" id="copy-btn">📋 Copy (1 left)</button>
+    </div>
+  </div>
+
+  <!-- REVEAL SCREEN -->
+  <div id="reveal-screen" class="hidden">
+    <div class="reveal-result" id="reveal-result">Correct!</div>
+    <div class="reveal-sub" id="reveal-sub"></div>
+    <p class="score-line">Your score: <b id="reveal-score">0</b> points</p>
+    <p class="subtitle">Waiting for the host to continue…</p>
+  </div>
+
+  <!-- ROUND COMPLETE SCREEN -->
+  <div id="round-complete-screen" class="hidden">
+    <div class="waiting-icon">🏁</div>
+    <h1 id="round-complete-title">Round Complete!</h1>
+    <div class="leaderboard">
+      <h3>Leaderboard</h3>
+      <div id="round-complete-lb"></div>
+    </div>
+    <p class="subtitle" style="margin-top:14px;">Waiting for the host to start the next round…</p>
+  </div>
+
+  <!-- GAME END SCREEN -->
+  <div id="end-screen" class="hidden">
+    <div class="waiting-icon">🏆</div>
+    <h1>Final Results</h1>
+    <div class="leaderboard">
+      <h3>Final Leaderboard</h3>
+      <div id="end-lb"></div>
+    </div>
+    <p class="subtitle" style="margin-top:14px;">Thanks for playing!</p>
+  </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function() {
+  const socket = io();
+  let myId = null;
+  let myName = null;
+  let hasSubmittedThisQuestion = false;
+  let peekUsed = false;
+  let copyUsed = false;
+
+  const screens = ["join-screen","waiting-screen","wager-screen","question-screen","reveal-screen","round-complete-screen","end-screen"];
+  function show(id) {
+    screens.forEach(s => document.getElementById(s).classList.toggle("hidden", s !== id));
+  }
+
+  document.getElementById("join-btn").addEventListener("click", join);
+  document.getElementById("name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") join(); });
+  function join() {
+    const name = document.getElementById("name-input").value.trim();
+    if (!name) return;
+    myName = name;
+    socket.emit("player:join", { name });
+  }
+
+  socket.on("player:joined", (data) => {
+    myId = data.id;
+    document.getElementById("waiting-sub").textContent = "Waiting for the host to start the game…";
+    show("waiting-screen");
+  });
+
+  let timerInterval = null;
+  function startTimer(elId, progressElId, startTime, timeLimit) {
+    clearInterval(timerInterval);
+    function tick() {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const remaining = Math.max(0, Math.ceil(timeLimit - elapsed));
+      document.getElementById(elId).textContent = remaining;
+      document.getElementById(progressElId).style.width = `${Math.max(0, 100 - (elapsed / timeLimit) * 100)}%`;
+      if (remaining <= 0) clearInterval(timerInterval);
+    }
+    tick();
+    timerInterval = setInterval(tick, 250);
+  }
+
+  socket.on("wager:show", (data) => {
+    hasSubmittedThisQuestion = false;
+    document.getElementById("wager-round-badge").textContent = `${data.roundName} — Q${data.questionNumber}/${data.totalQuestions}`;
+    document.getElementById("wager-current-score").textContent = data.currentScore;
+    document.getElementById("wager-input").value = "";
+    document.getElementById("wager-input").disabled = false;
+    document.getElementById("wager-submit-btn").disabled = false;
+    document.getElementById("wager-ack-banner").classList.add("hidden");
+    startTimer("wager-timer", "wager-progress", data.startTime, data.timeLimit);
+    show("wager-screen");
+
+    document.getElementById("wager-max-btn").onclick = () => {
+      document.getElementById("wager-input").value = data.currentScore;
+    };
+    document.getElementById("wager-submit-btn").onclick = () => {
+      const amount = parseInt(document.getElementById("wager-input").value, 10) || 0;
+      socket.emit("player:wager", { amount });
+    };
+  });
+
+  socket.on("wager:ack", (data) => {
+    document.getElementById("wager-input").disabled = true;
+    document.getElementById("wager-submit-btn").disabled = true;
+    const banner = document.getElementById("wager-ack-banner");
+    banner.textContent = `Wager locked in: ${data.amount} points. Get ready for the question!`;
+    banner.classList.remove("hidden", "error");
+  });
+
+  socket.on("question:show", (data) => {
+    hasSubmittedThisQuestion = false;
+    document.getElementById("q-round-badge").textContent = data.roundName;
+    document.getElementById("q-counter").textContent = `Question ${data.questionNumber} of ${data.totalQuestions}`;
+    document.getElementById("q-points-badge").textContent = data.wagering ? "Wagered pts" : `${data.pointValue} pts`;
+    document.getElementById("q-text").textContent = data.text;
+    document.getElementById("cheat-banner").classList.add("hidden");
+
+    const optionsDiv = document.getElementById("q-options");
+    optionsDiv.innerHTML = "";
+    data.options.forEach((opt, idx) => {
+      const btn = document.createElement("div");
+      btn.className = "opt";
+      btn.textContent = opt;
+      btn.addEventListener("click", () => {
+        if (hasSubmittedThisQuestion) return;
+        hasSubmittedThisQuestion = true;
+        document.querySelectorAll(".opt").forEach(el => el.classList.add("disabled"));
+        btn.classList.add("chosen");
+        socket.emit("player:answer", { optionIndex: idx });
+      });
+      optionsDiv.appendChild(btn);
+    });
+
+    document.getElementById("peek-btn").disabled = peekUsed;
+    document.getElementById("peek-btn").textContent = peekUsed ? "👀 Peek (used)" : "👀 Peek (1 left)";
+    document.getElementById("copy-btn").disabled = copyUsed;
+    document.getElementById("copy-btn").textContent = copyUsed ? "📋 Copy (used)" : "📋 Copy (1 left)";
+
+    startTimer("q-timer", "q-progress", data.startTime, data.timeLimit);
+    show("question-screen");
+  });
+
+  document.getElementById("peek-btn").addEventListener("click", () => {
+    socket.emit("player:peek");
+  });
+  document.getElementById("copy-btn").addEventListener("click", () => {
+    socket.emit("player:copy");
+  });
+
+  socket.on("peek:result", (data) => {
+    const banner = document.getElementById("cheat-banner");
+    if (data.error) {
+      banner.textContent = data.error;
+      banner.classList.remove("hidden");
+      banner.classList.add("error");
+      return;
+    }
+    peekUsed = true;
+    document.getElementById("peek-btn").disabled = true;
+    document.getElementById("peek-btn").textContent = "👀 Peek (used)";
+    banner.textContent = `👀 ${data.targetName} picked: "${data.optionText}"`;
+    banner.classList.remove("hidden", "error");
+  });
+
+  socket.on("copy:result", (data) => {
+    const banner = document.getElementById("cheat-banner");
+    if (data.error) {
+      banner.textContent = data.error;
+      banner.classList.remove("hidden");
+      banner.classList.add("error");
+      return;
+    }
+    copyUsed = true;
+    hasSubmittedThisQuestion = true;
+    document.getElementById("copy-btn").disabled = true;
+    document.getElementById("copy-btn").textContent = "📋 Copy (used)";
+    document.querySelectorAll(".opt").forEach((el, idx) => {
+      el.classList.add("disabled");
+      if (idx === data.optionIndex) el.classList.add("chosen");
+    });
+    banner.textContent = `📋 Copied ${data.targetName}'s answer: "${data.optionText}" — locked in!`;
+    banner.classList.remove("hidden", "error");
+  });
+
+  socket.on("reveal", (data) => {
+    clearInterval(timerInterval);
+    const resultEl = document.getElementById("reveal-result");
+    const subEl = document.getElementById("reveal-sub");
+    if (data.correct) {
+      resultEl.textContent = `Correct! +${data.pointsChange} pts`;
+      resultEl.className = "reveal-result correct";
+      subEl.textContent = `The answer was "${data.correctText}".`;
+    } else {
+      resultEl.textContent = data.pointsChange < 0 ? `Wrong. ${data.pointsChange} pts` : "Not quite!";
+      resultEl.className = "reveal-result wrong";
+      subEl.textContent = data.yourAnswerIndex === null
+        ? `Time's up! The answer was "${data.correctText}".`
+        : `The answer was "${data.correctText}".`;
+    }
+    document.getElementById("reveal-score").textContent = data.newScore;
+    show("reveal-screen");
+  });
+
+  function renderLeaderboard(containerId, leaderboard) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+    leaderboard.slice(0, 15).forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "lb-row" + (p.id === myId ? " me" : "");
+      row.innerHTML = `<span><span class="lb-rank">#${i + 1}</span>${p.name}${p.id === myId ? " (you)" : ""}</span><span>${p.score} pts</span>`;
+      container.appendChild(row);
+    });
+  }
+
+  socket.on("round:complete", (data) => {
+    document.getElementById("round-complete-title").textContent = `${data.roundName} Complete!`;
+    renderLeaderboard("round-complete-lb", data.leaderboard);
+    show("round-complete-screen");
+  });
+
+  socket.on("game:end", (data) => {
+    renderLeaderboard("end-lb", data.leaderboard);
+    show("end-screen");
+  });
+})();
+</script>
+</body>
+</html>
