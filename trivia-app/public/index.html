@@ -88,6 +88,7 @@
     <h1>Are You Smarter Than<br><span class="hi">a 5th Grader?</span></h1>
     <p class="subtitle">Enter your name to join the live game.</p>
     <input type="text" id="name-input" placeholder="Your name" maxlength="24">
+    <div class="banner error hidden" id="join-error-banner"></div>
     <button class="big" id="join-btn">Join Game</button>
   </div>
 
@@ -96,6 +97,7 @@
     <div class="waiting-icon">⏳</div>
     <h1 id="waiting-title">You're in!</h1>
     <p class="subtitle" id="waiting-sub">Waiting for the host to start the game…</p>
+    <p class="subtitle" style="margin-top:18px;"><a href="#" id="not-you-link" style="color:#9aa3b5;">Not you? Play as someone else</a></p>
   </div>
 
   <!-- WAGER SCREEN -->
@@ -182,20 +184,54 @@
     screens.forEach(s => document.getElementById(s).classList.toggle("hidden", s !== id));
   }
 
-  document.getElementById("join-btn").addEventListener("click", join);
-  document.getElementById("name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") join(); });
-  function join() {
-    const name = document.getElementById("name-input").value.trim();
+  const NAME_STORAGE_KEY = "trivia_player_name";
+
+  document.getElementById("join-btn").addEventListener("click", () => join(document.getElementById("name-input").value.trim()));
+  document.getElementById("name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") join(document.getElementById("name-input").value.trim()); });
+  document.getElementById("not-you-link").addEventListener("click", (e) => {
+    e.preventDefault();
+    localStorage.removeItem(NAME_STORAGE_KEY);
+    myName = null;
+    myId = null;
+    document.getElementById("name-input").value = "";
+    document.getElementById("join-error-banner").classList.add("hidden");
+    show("join-screen");
+  });
+
+  function join(name) {
     if (!name) return;
     myName = name;
+    document.getElementById("join-error-banner").classList.add("hidden");
     socket.emit("player:join", { name });
   }
 
+  socket.on("player:join:error", (data) => {
+    const banner = document.getElementById("join-error-banner");
+    banner.textContent = data.message;
+    banner.classList.remove("hidden");
+    show("join-screen");
+  });
+
   socket.on("player:joined", (data) => {
     myId = data.id;
-    document.getElementById("waiting-sub").textContent = "Waiting for the host to start the game…";
+    localStorage.setItem(NAME_STORAGE_KEY, myName || data.name);
+    document.getElementById("waiting-sub").textContent = data.reconnected
+      ? `Welcome back! Your score (${data.score} pts) picked up right where you left off.`
+      : "Waiting for the host to start the game…";
+    peekUsed = !!data.peekUsed;
+    copyUsed = !!data.copyUsed;
     show("waiting-screen");
   });
+
+  // Auto-rejoin on page load if we recognize this browser (refresh / dropped
+  // connection recovery) — the server matches by name and restores state.
+  const savedName = localStorage.getItem(NAME_STORAGE_KEY);
+  if (savedName) {
+    document.getElementById("name-input").value = savedName;
+    document.getElementById("waiting-sub").textContent = "Reconnecting…";
+    show("waiting-screen");
+    join(savedName);
+  }
 
   let timerInterval = null;
   function startTimer(elId, progressElId, startTime, timeLimit) {
@@ -270,6 +306,17 @@
 
     startTimer("q-timer", "q-progress", data.startTime, data.timeLimit);
     show("question-screen");
+  });
+
+  // Fires either right after we click an option, or on reconnect/refresh if
+  // the server already has a locked-in answer for us — in both cases, make
+  // sure the UI reflects "already answered" rather than letting them answer twice.
+  socket.on("answer:ack", (data) => {
+    hasSubmittedThisQuestion = true;
+    document.querySelectorAll(".opt").forEach((el, idx) => {
+      el.classList.add("disabled");
+      if (idx === data.optionIndex) el.classList.add("chosen");
+    });
   });
 
   document.getElementById("peek-btn").addEventListener("click", () => {

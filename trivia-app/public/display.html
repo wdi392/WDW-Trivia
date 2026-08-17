@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Are You Smarter Than a 5th Grader? — Room Display</title>
+<style>
+  :root { --yellow:#ffd23f; --red:#ff5e5e; --blue:#2e86de; --green:#2ecc71; --purple:#7d5fff; --dark:#0d1420; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin:0; height:100%; width:100%; overflow:hidden;
+    font-family:'Trebuchet MS','Segoe UI',sans-serif;
+    background: linear-gradient(135deg,#1a1f4d,#0d1420,#3a2e5c);
+    background-size:400% 400%; animation: gradientShift 22s ease infinite;
+    color:#fff;
+  }
+  @keyframes gradientShift { 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+  .stage {
+    height:100vh; width:100vw; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:4vh 4vw; text-align:center;
+    position:relative;
+  }
+  .hidden { display:none !important; }
+
+  .title { font-size:5vh; font-weight:bold; margin:0 0 1vh; text-shadow:0 4px 12px rgba(0,0,0,0.4); }
+  .title .hi { color:var(--yellow); }
+  .subtitle { font-size:2.4vh; color:#c7ccdb; margin-bottom:3vh; }
+
+  .badge-row { display:flex; gap:1.2vw; margin-bottom:2vh; flex-wrap:wrap; justify-content:center; }
+  .badge { padding:0.8vh 2vw; border-radius:999px; font-size:2vh; font-weight:bold; color:#fff; }
+  .badge.round { background:var(--purple); }
+  .badge.count { background:var(--blue); }
+
+  .timer-wrap { position:relative; width:22vh; height:22vh; margin:1vh auto 3vh; }
+  .timer-wrap svg { transform: rotate(-90deg); width:100%; height:100%; }
+  .timer-wrap circle { fill:none; stroke-width:10; }
+  .timer-track { stroke:rgba(255,255,255,0.15); }
+  .timer-fill { stroke:var(--yellow); stroke-linecap:round; transition: stroke-dashoffset 1s linear, stroke 0.3s ease; }
+  .timer-fill.urgent { stroke:var(--red); }
+  .timer-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:6vh; font-weight:bold; }
+  .timer-num.urgent { color:var(--red); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.12); } }
+
+  .question-text { font-size:4.2vh; font-weight:bold; max-width:88vw; margin-bottom:3vh; line-height:1.3; text-shadow:0 2px 8px rgba(0,0,0,0.4); }
+  .options-grid { display:grid; grid-template-columns:1fr 1fr; gap:2vh 2vw; width:82vw; max-width:1100px; }
+  .option-card {
+    background:rgba(255,255,255,0.08); border:3px solid rgba(255,255,255,0.2); border-radius:18px;
+    padding:2.4vh 2vw; font-size:2.8vh; font-weight:bold; text-align:left; backdrop-filter: blur(4px);
+  }
+  .option-card.correct { background:rgba(46,204,113,0.25); border-color:var(--green); color:#8ff5b8; }
+  .option-card .letter { display:inline-block; width:1.4em; height:1.4em; line-height:1.4em; text-align:center; border-radius:50%; background:rgba(255,255,255,0.15); margin-right:0.6em; font-size:0.8em; }
+
+  .lb-list { width:78vw; max-width:900px; }
+  .lb-row {
+    display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.06);
+    border-radius:14px; padding:1.4vh 2vw; margin-bottom:1.2vh; font-size:2.6vh; font-weight:bold;
+    position:relative; overflow:hidden;
+  }
+  .lb-row .bar { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg, var(--purple), var(--blue)); opacity:0.35; transition: width 0.8s ease; z-index:0; }
+  .lb-row .lb-content { position:relative; z-index:1; display:flex; justify-content:space-between; width:100%; align-items:center; }
+  .lb-row .rank { color:var(--yellow); margin-right:0.6em; }
+  .lb-row.top1 { border:2px solid var(--yellow); }
+
+  .winner-banner { font-size:6vh; font-weight:bold; color:var(--yellow); margin-bottom:2vh; text-shadow:0 4px 16px rgba(0,0,0,0.5); }
+
+  .join-list { display:flex; flex-wrap:wrap; gap:1vh 1vw; justify-content:center; max-width:80vw; margin-top:2vh; }
+  .join-chip { background:rgba(255,255,255,0.1); border-radius:999px; padding:0.8vh 1.6vw; font-size:2vh; }
+
+  .confetti { position:absolute; top:-5vh; font-size:3vh; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(360deg); opacity:0.2; } }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage-lobby">
+  <div class="title">Are You Smarter Than <span class="hi">a 5th Grader?</span></div>
+  <div class="subtitle" id="lobby-subtitle">Waiting for players to join…</div>
+  <div class="badge-row">
+    <span class="badge count" id="lobby-count">0 players joined</span>
+  </div>
+  <div class="join-list" id="join-list"></div>
+</div>
+
+<div class="stage hidden" id="stage-wager">
+  <div class="badge-row"><span class="badge round" id="wager-round-badge">Bonus Round</span></div>
+  <div class="question-text">💰 Wager Time!</div>
+  <div class="subtitle">Everyone is deciding how many points to risk…</div>
+  <div class="timer-wrap">
+    <svg viewBox="0 0 100 100">
+      <circle class="timer-track" cx="50" cy="50" r="45"></circle>
+      <circle class="timer-fill" id="wager-timer-fill" cx="50" cy="50" r="45"></circle>
+    </svg>
+    <div class="timer-num" id="wager-timer-num">20</div>
+  </div>
+  <div class="badge-row"><span class="badge count" id="wager-progress-badge">0 / 0 wagered</span></div>
+</div>
+
+<div class="stage hidden" id="stage-question">
+  <div class="badge-row">
+    <span class="badge round" id="q-round-badge">Round 1</span>
+    <span class="badge count" id="q-progress-badge">Question 1 of 15</span>
+    <span class="badge count" id="q-points-badge">10 pts</span>
+  </div>
+  <div class="timer-wrap">
+    <svg viewBox="0 0 100 100">
+      <circle class="timer-track" cx="50" cy="50" r="45"></circle>
+      <circle class="timer-fill" id="q-timer-fill" cx="50" cy="50" r="45"></circle>
+    </svg>
+    <div class="timer-num" id="q-timer-num">30</div>
+  </div>
+  <div class="question-text" id="q-text">Question text</div>
+  <div class="options-grid" id="q-options"></div>
+  <div class="badge-row" style="margin-top:2.4vh;"><span class="badge count" id="q-answered-badge">0 / 0 answered</span></div>
+</div>
+
+<div class="stage hidden" id="stage-reveal">
+  <div class="badge-row"><span class="badge round" id="reveal-round-badge">Round 1</span></div>
+  <div class="question-text" id="reveal-q-text">Question text</div>
+  <div class="options-grid" id="reveal-options"></div>
+  <div class="lb-list" id="reveal-lb" style="margin-top:3vh;"></div>
+</div>
+
+<div class="stage hidden" id="stage-roundcomplete">
+  <div class="title" id="roundcomplete-title">Round Complete!</div>
+  <div class="lb-list" id="roundcomplete-lb"></div>
+</div>
+
+<div class="stage hidden" id="stage-ended">
+  <div class="winner-banner" id="winner-banner">🏆 Winner!</div>
+  <div class="lb-list" id="ended-lb"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function() {
+  const socket = io();
+  socket.emit("display:join");
+
+  const CIRC = 2 * Math.PI * 45;
+
+  const stages = ["stage-lobby","stage-wager","stage-question","stage-reveal","stage-roundcomplete","stage-ended"];
+  function showStage(id) {
+    stages.forEach(s => document.getElementById(s).classList.toggle("hidden", s !== id));
+  }
+
+  function setTimerRing(fillEl, numEl, remaining, total) {
+    const frac = Math.max(0, Math.min(1, remaining / total));
+    fillEl.style.strokeDasharray = `${CIRC}`;
+    fillEl.style.strokeDashoffset = `${CIRC * (1 - frac)}`;
+    numEl.textContent = Math.ceil(remaining);
+    const urgent = remaining <= 10;
+    fillEl.classList.toggle("urgent", urgent);
+    numEl.classList.toggle("urgent", urgent);
+  }
+
+  let ringInterval = null;
+  function startRing(fillEl, numEl, startTime, timeLimit) {
+    clearInterval(ringInterval);
+    function tick() {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const remaining = Math.max(0, timeLimit - elapsed);
+      setTimerRing(fillEl, numEl, remaining, timeLimit);
+      if (remaining <= 0) clearInterval(ringInterval);
+    }
+    tick();
+    ringInterval = setInterval(tick, 200);
+  }
+
+  function renderLeaderboard(container, players) {
+    container.innerHTML = "";
+    const maxScore = Math.max(1, ...players.map(p => p.score));
+    players.slice(0, 12).forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "lb-row" + (i === 0 ? " top1" : "");
+      const barWidth = Math.max(4, (Math.max(p.score, 0) / maxScore) * 100);
+      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "";
+      row.innerHTML = `
+        <div class="bar" style="width:${barWidth}%"></div>
+        <div class="lb-content">
+          <span><span class="rank">#${i + 1}</span>${medal} ${p.name}${p.connected === false ? " (left)" : ""}</span>
+          <span>${p.score} pts</span>
+        </div>`;
+      container.appendChild(row);
+    });
+  }
+
+  function letterFor(i) { return ["A","B","C","D"][i]; }
+
+  let lastPhase = null;
+  let lastStartTime = null;
+
+  socket.on("lobby:update", (data) => {
+    document.getElementById("lobby-count").textContent = `${data.players.length} player${data.players.length === 1 ? "" : "s"} joined`;
+    const joinList = document.getElementById("join-list");
+    joinList.innerHTML = "";
+    data.players.slice(0, 60).forEach((p) => {
+      const chip = document.createElement("div");
+      chip.className = "join-chip";
+      chip.textContent = p.name;
+      joinList.appendChild(chip);
+    });
+  });
+
+  socket.on("host:state", (state) => {
+    if (state.phase === "lobby") {
+      if (state.roundIndex >= 0) {
+        // A round just finished — show the round-complete recap instead of the plain lobby.
+        document.getElementById("roundcomplete-title").textContent = `${state.roundName} Complete!`;
+        renderLeaderboard(document.getElementById("roundcomplete-lb"), state.players);
+        showStage("stage-roundcomplete");
+      } else {
+        showStage("stage-lobby");
+      }
+    } else if (state.phase === "wager") {
+      document.getElementById("wager-round-badge").textContent = `${state.roundName} — Q${state.questionIndex + 1}/${state.totalQuestionsInRound}`;
+      document.getElementById("wager-progress-badge").textContent = `${state.wageredCount} / ${state.totalPlayers} wagered`;
+      if (state.startTime && state.startTime !== lastStartTime) {
+        lastStartTime = state.startTime;
+        startRing(document.getElementById("wager-timer-fill"), document.getElementById("wager-timer-num"), state.startTime, state.timeLimit || 20);
+      }
+      showStage("stage-wager");
+    } else if (state.phase === "question") {
+      document.getElementById("q-round-badge").textContent = state.roundName;
+      document.getElementById("q-progress-badge").textContent = `Question ${state.questionIndex + 1} of ${state.totalQuestionsInRound}`;
+      document.getElementById("q-points-badge").textContent = state.wagering ? "Wagered pts" : `${state.pointValue} pts`;
+      document.getElementById("q-text").textContent = state.questionText || "";
+      document.getElementById("q-answered-badge").textContent = `${state.answeredCount} / ${state.totalPlayers} answered`;
+
+      const optionsGrid = document.getElementById("q-options");
+      optionsGrid.innerHTML = "";
+      (state.options || []).forEach((opt, idx) => {
+        const card = document.createElement("div");
+        card.className = "option-card";
+        card.innerHTML = `<span class="letter">${letterFor(idx)}</span>${opt}`;
+        optionsGrid.appendChild(card);
+      });
+
+      if (state.startTime && state.startTime !== lastStartTime) {
+        lastStartTime = state.startTime;
+        startRing(document.getElementById("q-timer-fill"), document.getElementById("q-timer-num"), state.startTime, state.timeLimit || 30);
+      }
+      showStage("stage-question");
+    } else if (state.phase === "ended") {
+      const winner = state.players[0];
+      document.getElementById("winner-banner").textContent = winner ? `🏆 ${winner.name} wins with ${winner.score} pts!` : "🏆 Game Over!";
+      renderLeaderboard(document.getElementById("ended-lb"), state.players);
+      showStage("stage-ended");
+      launchConfetti();
+    }
+    lastPhase = state.phase;
+  });
+
+  socket.on("host:reveal", (data) => {
+    clearInterval(ringInterval);
+    document.getElementById("reveal-round-badge").textContent = document.getElementById("q-round-badge").textContent;
+    document.getElementById("reveal-q-text").textContent = document.getElementById("q-text").textContent;
+
+    const optionsGrid = document.getElementById("reveal-options");
+    optionsGrid.innerHTML = "";
+    const currentOptions = Array.from(document.getElementById("q-options").children).map(el => el.textContent.replace(/^[A-D]/, "").trim());
+    currentOptions.forEach((opt, idx) => {
+      const card = document.createElement("div");
+      card.className = "option-card" + (opt === data.correctText ? " correct" : "");
+      card.innerHTML = `<span class="letter">${letterFor(idx)}</span>${opt}`;
+      optionsGrid.appendChild(card);
+    });
+
+    renderLeaderboard(document.getElementById("reveal-lb"), data.leaderboard);
+    showStage("stage-reveal");
+  });
+
+  function launchConfetti() {
+    const emojis = ["🎉","🎊","⭐","🏆","✨"];
+    for (let i = 0; i < 40; i++) {
+      setTimeout(() => {
+        const el = document.createElement("div");
+        el.className = "confetti";
+        el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        el.style.left = `${Math.random() * 100}vw`;
+        el.style.animationDuration = `${3 + Math.random() * 3}s`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 7000);
+      }, i * 80);
+    }
+  }
+})();
+</script>
+</body>
+</html>
