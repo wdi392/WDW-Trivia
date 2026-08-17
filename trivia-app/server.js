@@ -53,6 +53,15 @@ function broadcastLobby() {
 }
 function broadcastHostState(extra = {}) {
   const round = currentRound();
+  const q = currentQuestion();
+  // Derive the current question's display info from persistent game state
+  // every time, rather than relying on one-off "extra" fields passed in only
+  // when a question first starts — otherwise the very next broadcast (which
+  // fires on every player answer/wager/peek/copy) would wipe it back out for
+  // anyone who joined or was just re-rendered, like the room display.
+  const timeLimit = round
+    ? (game.phase === "wager" ? (round.wagerTimeLimit || 20) : (round.timeLimit || 30))
+    : undefined;
   const payload = {
     phase: game.phase,
     roundIndex: game.roundIndex,
@@ -66,6 +75,11 @@ function broadcastHostState(extra = {}) {
     players: publicPlayerList(),
     totalRounds: ROUNDS.length,
     roundList: ROUNDS.map((r, i) => ({ index: i, name: r.name, questionCount: r.questions.length })),
+    questionText: q ? q.text : undefined,
+    options: q ? q.options : undefined,
+    pointValue: round ? round.pointValue : undefined,
+    timeLimit,
+    startTime: game.questionStartTime,
     ...extra,
   };
   io.to("hosts").emit("host:state", payload);
@@ -368,7 +382,7 @@ function startWagerPhase() {
       });
     }
   }
-  broadcastHostState({ timeLimit, startTime: game.questionStartTime });
+  broadcastHostState();
   game.autoTimer = setTimeout(() => startQuestionPhase(), timeLimit * 1000);
 }
 
@@ -391,7 +405,7 @@ function startQuestionPhase() {
     pointValue: round.wagering ? null : round.pointValue,
     wagering: !!round.wagering,
   });
-  broadcastHostState({ questionText: q.text, options: q.options, timeLimit, pointValue: round.pointValue, startTime: game.questionStartTime });
+  broadcastHostState();
   game.autoTimer = setTimeout(() => revealNow(), timeLimit * 1000);
 }
 
